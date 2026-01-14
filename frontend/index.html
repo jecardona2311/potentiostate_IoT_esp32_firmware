@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potentiostat IoT Control</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Potentiostat IoT Control Dashboard</h1>
+
+        <!-- System Status Bar -->
+        <div class="system-status-bar">
+            <div class="status-chip" id="dbStatusChip" onclick="showDatabaseDetails()">
+                <span class="status-icon">DB</span>
+                <span class="status-text" id="dbStatusText">Checking...</span>
+            </div>
+            <div class="status-chip" id="mqttStatusChip">
+                <span class="status-icon">MQTT</span>
+                <span class="status-text" id="mqttStatusBarText">Disconnected</span>
+            </div>
+            <div class="status-chip" id="wifiStatusChip" onclick="toggleWifiPanel()">
+                <span class="status-icon">WiFi</span>
+                <span class="status-text" id="wifiStatusText">--</span>
+            </div>
+            <div class="status-chip" id="transmissionChip" onclick="showTransmissionDetails()">
+                <span class="status-icon">TX</span>
+                <span class="status-text" id="txStatusText">0 msg</span>
+            </div>
+            <div class="status-chip" id="esp32ConfigChip" onclick="showEsp32ConfigModal()">
+                <span class="status-icon">ESP32</span>
+                <span class="status-text" id="esp32StatusText">Config</span>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- Connection Settings - Full Width -->
+            <div class="card full-width" id="connectionSettingsCard">
+                <h2>Connection Settings</h2>
+
+                <div class="status-group">
+                    <div class="status-item">
+                        <span class="status-label">MQTT:</span>
+                        <div class="status-indicator" id="mqttStatus">
+                            <div class="status-dot"></div>
+                            <span id="mqttText">Disconnected</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">WiFi:</span>
+                        <div class="status-indicator" id="wifiStatusIndicator">
+                            <div class="status-dot"></div>
+                            <span id="wifiConnectionText">Disconnected</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Session:</span>
+                        <div class="status-indicator" id="sessionStatus">
+                            <div class="status-dot"></div>
+                            <span id="sessionText">Inactive</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="connection-grid">
+                    <!-- MQTT Configuration Section -->
+                    <div class="config-section">
+                        <h3>MQTT Broker</h3>
+                        <div class="param-group">
+                            <label for="mqttBroker">Broker URL</label>
+                            <input type="text" id="mqttBroker" value="57f57f62bdd7478ba34af49e9c090208.s1.eu.hivemq.cloud" placeholder="broker.example.com">
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group half">
+                                <label for="mqttPort">Port</label>
+                                <input type="number" id="mqttPort" value="8884" placeholder="8884">
+                            </div>
+                            <div class="param-group half checkbox-group">
+                                <label for="mqttSSL">
+                                    <input type="checkbox" id="mqttSSL" checked> Use TLS/SSL
+                                </label>
+                            </div>
+                        </div>
+                        <div class="param-group">
+                            <label for="mqttUsername">Username</label>
+                            <input type="text" id="mqttUsername" value="potentiostat" placeholder="MQTT username">
+                        </div>
+                        <div class="param-group">
+                            <label for="mqttPassword">Password</label>
+                            <input type="password" id="mqttPassword" value="POT123456s" placeholder="MQTT password">
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="connectMQTT()">Connect MQTT</button>
+                            <button class="btn btn-secondary" onclick="saveConnectionSettings()">Save Settings</button>
+                        </div>
+                    </div>
+
+                    <!-- WiFi Configuration Section -->
+                    <div class="config-section" id="wifiPanel">
+                        <h3>WiFi Network</h3>
+                        <div class="wifi-status-section">
+                            <div class="wifi-current-status">
+                                <span class="wifi-label">Connected to:</span>
+                                <span class="wifi-ssid" id="currentWifiSSID">Not connected</span>
+                                <span class="wifi-signal" id="currentWifiSignal"></span>
+                            </div>
+                            <div class="wifi-ip" id="currentWifiIP"></div>
+                        </div>
+
+                        <div class="wifi-actions">
+                            <button class="btn btn-info btn-sm" onclick="scanWifiNetworks()">Scan Networks</button>
+                            <button class="btn btn-success btn-sm" onclick="saveCurrentWifiNetwork()">Save Network</button>
+                            <button class="btn btn-danger btn-sm" onclick="disconnectWifi()">Disconnect</button>
+                        </div>
+
+                        <div class="wifi-networks-list" id="wifiNetworksList">
+                            <div class="wifi-placeholder">Click "Scan Networks" to discover available networks</div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <h4>Saved Networks</h4>
+                        <div class="wifi-saved-list" id="wifiSavedList">
+                            <div class="wifi-placeholder">No saved networks</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CV Parameters -->
+            <div class="card">
+                <h2>CV Parameters</h2>
+
+                <div class="param-group">
+                    <label for="userAlias">User Alias</label>
+                    <input type="text" id="userAlias" value="default_user" placeholder="Enter your alias">
+                </div>
+
+                <div class="param-group">
+                    <label for="startPoint">Start Point (V)</label>
+                    <input type="number" id="startPoint" value="0.000" step="0.001" min="-1.000" max="1.000">
+                </div>
+
+                <div class="param-group">
+                    <label for="firstVertex">First Vertex (V)</label>
+                    <input type="number" id="firstVertex" value="0.700" step="0.001">
+                </div>
+
+                <div class="param-group">
+                    <label for="secondVertex">Second Vertex (V)</label>
+                    <input type="number" id="secondVertex" value="-0.700" step="0.001">
+                </div>
+
+                <div class="param-group">
+                    <label for="zeroCrosses">Zero Crosses</label>
+                    <input type="number" id="zeroCrosses" value="4" step="1" min="1">
+                </div>
+
+                <div class="param-group">
+                    <label for="scanRate">Scan Rate (V/s)</label>
+                    <input type="number" id="scanRate" value="0.100" step="0.001" min="0.001" max="1.000">
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="startScan()">Start Scan</button>
+                    <button class="btn btn-danger" onclick="stopScan()">Stop Scan</button>
+                </div>
+            </div>
+
+            <!-- Biosensor Data -->
+            <div class="card">
+                <h2>Biosensor Data</h2>
+
+                <div class="hr-control-buttons">
+                    <button type="button" class="btn btn-success" onclick="startHRMonitoring()">Start HR Monitor</button>
+                    <button type="button" class="btn btn-danger" onclick="stopHRMonitoring()">Stop HR Monitor</button>
+                </div>
+
+                <div class="sensor-grid">
+                    <div class="sensor-card heart">
+                        <div class="sensor-icon">&#10084;</div>
+                        <div class="sensor-info">
+                            <span class="sensor-label">Heart Rate</span>
+                            <span class="sensor-value" id="bpmValue">-- BPM</span>
+                            <span class="sensor-avg" id="avgBpmValue">Avg: --</span>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card oxygen">
+                        <div class="sensor-icon">O2</div>
+                        <div class="sensor-info">
+                            <span class="sensor-label">SpO2</span>
+                            <span class="sensor-value" id="spo2Value">-- %</span>
+                            <span class="sensor-avg" id="avgSpo2Value">Avg: --</span>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card stress">
+                        <div class="sensor-icon">~</div>
+                        <div class="sensor-info">
+                            <span class="sensor-label">Stress Level</span>
+                            <span class="sensor-value" id="stressValue">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="log-container">
+                    <h3>Recent Readings</h3>
+                    <div class="log-scroll" id="bioLog">
+                        <div class="log-entry">Waiting for data...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card full-width">
+                <h2>Cyclic Voltammetry</h2>
+                <div class="chart-controls">
+                    <!-- Deployable Download Menu -->
+                    <div class="dropdown">
+                        <button class="btn btn-info btn-sm dropdown-toggle" onclick="toggleDownloadMenu()">
+                            Download Data
+                            <span class="dropdown-arrow">&#9660;</span>
+                        </button>
+                        <div class="dropdown-menu" id="downloadMenu">
+                            <a class="dropdown-item" onclick="downloadCSV()">
+                                <span class="file-icon">CSV</span>
+                                Download CSV
+                            </a>
+                            <a class="dropdown-item" onclick="downloadTXT()">
+                                <span class="file-icon">TXT</span>
+                                Download TXT
+                            </a>
+                            <a class="dropdown-item" onclick="downloadXLSX()">
+                                <span class="file-icon">XLS</span>
+                                Download Excel (XLSX)
+                            </a>
+                            <a class="dropdown-item" onclick="downloadJSON()">
+                                <span class="file-icon">JSON</span>
+                                Download JSON
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" onclick="downloadCurrentData()">
+                                <span class="file-icon">*</span>
+                                Export Current Chart Data
+                            </a>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="clearChart()">Clear Chart</button>
+                    <div class="cv-status-indicator" id="cvStatusIndicator">
+                        <div class="cv-status-dot" id="cvStatusDot"></div>
+                        <span class="cv-status-text" id="cvStatusText">Not Started</span>
+                    </div>
+                    <span class="data-count">Points: <strong id="pointCount">0</strong></span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cvChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Data Transmission Status -->
+            <div class="card" id="transmissionPanel">
+                <h2>Data Transmission</h2>
+
+                <div class="transmission-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Messages Received</span>
+                        <span class="stat-value" id="msgReceived">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Messages Processed</span>
+                        <span class="stat-value" id="msgProcessed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Data Points Saved</span>
+                        <span class="stat-value" id="dataSaved">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Errors</span>
+                        <span class="stat-value error" id="txErrors">0</span>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="db-status-section">
+                    <h3>Database Status</h3>
+                    <div class="db-info">
+                        <div class="db-item">
+                            <span class="db-label">Connection:</span>
+                            <span class="db-value" id="dbConnection">Checking...</span>
+                        </div>
+                        <div class="db-item">
+                            <span class="db-label">Host:</span>
+                            <span class="db-value" id="dbHost">--</span>
+                        </div>
+                        <div class="db-item">
+                            <span class="db-label">Users:</span>
+                            <span class="db-value" id="dbUsers">--</span>
+                        </div>
+                        <div class="db-item">
+                            <span class="db-label">Measurements:</span>
+                            <span class="db-value" id="dbMeasurements">--</span>
+                        </div>
+                        <div class="db-item">
+                            <span class="db-label">CV Data Points:</span>
+                            <span class="db-value" id="dbCvPoints">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="uptime-section">
+                    <span class="uptime-label">System Uptime:</span>
+                    <span class="uptime-value" id="systemUptime">--</span>
+                </div>
+            </div>
+
+            <!-- System Log -->
+            <div class="card">
+                <h2>System Log</h2>
+                <div class="log-scroll" id="systemLog">
+                    <div class="log-entry">System initialized. Connect to MQTT to start...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WiFi Password Modal -->
+    <div class="modal" id="wifiPasswordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Connect to WiFi</h3>
+                <button class="modal-close" onclick="closeWifiModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Network: <strong id="modalWifiSSID"></strong></p>
+                <div class="param-group">
+                    <label for="wifiPassword">Password</label>
+                    <input type="password" id="wifiPassword" placeholder="Enter WiFi password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeWifiModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitWifiConnect()">Connect</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transmission Details Modal -->
+    <div class="modal" id="transmissionModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>Transmission Details</h3>
+                <button class="modal-close" onclick="closeTransmissionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="transmissionDetails">Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-info" onclick="refreshTransmissionDetails()">Refresh</button>
+                <button class="btn btn-secondary" onclick="closeTransmissionModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESP32 Configuration Modal -->
+    <div class="modal" id="esp32ConfigModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>ESP32 Device Configuration</h3>
+                <button class="modal-close" onclick="closeEsp32ConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-grid">
+                    <!-- WiFi Configuration -->
+                    <div class="config-section">
+                        <h4>WiFi Credentials</h4>
+                        <div class="param-group">
+                            <label for="esp32WifiSsid">WiFi SSID</label>
+                            <input type="text" id="esp32WifiSsid" placeholder="Network name">
+                        </div>
+                        <div class="param-group">
+                            <label for="esp32WifiPassword">WiFi Password</label>
+                            <input type="password" id="esp32WifiPassword" placeholder="Network password">
+                        </div>
+                    </div>
+
+                    <!-- MQTT Configuration -->
+                    <div class="config-section">
+                        <h4>MQTT Credentials</h4>
+                        <div class="param-group">
+                            <label for="esp32MqttBroker">MQTT Broker</label>
+                            <input type="text" id="esp32MqttBroker" placeholder="broker.example.com">
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group half">
+                                <label for="esp32MqttPort">Port</label>
+                                <input type="number" id="esp32MqttPort" value="8883" placeholder="8883">
+                            </div>
+                            <div class="param-group half">
+                                <label for="esp32MqttClientId">Client ID</label>
+                                <input type="text" id="esp32MqttClientId" placeholder="ESP32_Device">
+                            </div>
+                        </div>
+                        <div class="param-group">
+                            <label for="esp32MqttUsername">Username</label>
+                            <input type="text" id="esp32MqttUsername" placeholder="MQTT username">
+                        </div>
+                        <div class="param-group">
+                            <label for="esp32MqttPassword">Password</label>
+                            <input type="password" id="esp32MqttPassword" placeholder="MQTT password">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-status" id="esp32ConfigStatus"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-info" onclick="requestEsp32Status()">Get Current Config</button>
+                <button class="btn btn-warning" onclick="sendEsp32Credentials(false)">Save Only</button>
+                <button class="btn btn-success" onclick="sendEsp32Credentials(true)">Save &amp; Apply</button>
+                <button class="btn btn-secondary" onclick="closeEsp32ConfigModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/mqtt-client.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

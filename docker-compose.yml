@@ -1,0 +1,81 @@
+services:
+  # Backend Node.js
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: potentiostat-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # HiveMQ Cloud
+      MQTT_BROKER: ${MQTT_BROKER}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      
+      # PostgreSQL (si usas DB externa)
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-potentiostat_iot}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      
+      # Server
+      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-production}
+      FRONTEND_URL: http://localhost:8080
+
+    # IMPORTANTE: Montar backend solo si es desarrollo
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+    networks:
+      - potentiostat-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Frontend (NGINX)
+  frontend:
+    image: nginx:latest
+    container_name: potentiostat-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      # Archivo nginx.conf correcto (asegúrate que existe en la raíz!)
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - potentiostat-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MQTT Client Test (Opcional)
+  mqtt-client:
+    image: efrecon/mqtt-client
+    container_name: potentiostat-mqtt-test
+    restart: "no"
+    command: sub -h ${MQTT_BROKER} -p 8883 -t "potentiostat/#" -v
+    networks:
+      - potentiostat-network
+    profiles:
+      - testing
+
+networks:
+  potentiostat-network:
+    driver: bridge

@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(node --check:*)",
+      "Bash(timeout 10 node:*)",
+      "Bash(node -e:*)",
+      "Bash(dir /s /b *.js *.html *.css)",
+      "Bash(findstr:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker restart:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(ping:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(docker ps:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx http-server -p 8080)",
+      "Bash(net start postgresql-x64-17)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"SELECT datname FROM pg_database WHERE datname = ''potentiostat_iot'';\")",
+      "Bash(netstat:*)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)"
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Windows artifacts
+nul
+
+# Build artifacts
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+
+# IDE files
+.vscode/
+*.code-workspace
+.idea/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Arduino
+build/
+*.d
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Credentials (keep defaults, ignore custom)
+secrets.h
+.env
+*.env
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
